@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "engines": [
+    {
+      "id": "frida-ios-dump-modern",
+      "path": "frida-ios-dump-modern",
+      "platform": "ios",
+      "kind": "python",
+      "entry": "dump.py",
+      "requirements": "frida-ios-dump-modern/requirements.txt",
+      "frida": ">=17.5.2",
+      "upstream": "https://github.com/jwalker/frida-ios-dump-modern",
+      "upstreamCommit": "1aa76eb565f29077faa07dbbf334dec1bca89228",
+      "license": "MIT",
+      "status": "integrated"
+    }
+  ]
+}

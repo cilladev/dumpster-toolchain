@@ -1,0 +1,9 @@
+dumpster-toolchain bundles third-party engines. Each keeps its own license in its folder.
+
+frida-ios-dump-modern/
+  Upstream: https://github.com/jwalker/frida-ios-dump-modern
+  License:  MIT, Copyright (c) 2026 Jacolon Walker (see frida-ios-dump-modern/LICENSE)
+  Changes:  dump_app hardening (partial-dump refusal, safe module names/paths,
+            per-framework binary paths). See git history.
+
+Frida itself is NOT included. It is installed at runtime from PyPI (frida, frida-tools).
