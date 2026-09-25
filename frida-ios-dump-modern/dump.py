@@ -140,6 +140,8 @@ class ModernIOSDumper:
 
     def dump_app(self, bundle_id_or_name, output_dir=None):
         """Main dump function"""
+        session = None
+        ssh = None
         try:
             # Attach to app
             session, app = self.attach_to_app(bundle_id_or_name)
@@ -163,10 +165,25 @@ class ModernIOSDumper:
             print(f"[*] Found {len(modules)} modules to dump:")
             for mod in modules:
                 print(f"    - {mod['name']} ({mod['size']} bytes)")
+            if len({mod['name'] for mod in modules}) != len(modules):
+                raise ValueError('Duplicate module names are not supported by the device agent')
 
             # Dump all modules
             print(f"\n[*] Starting dump...")
             results = script.exports_sync.dump_all()
+            if not results.get('modules') or any(not mod['success'] for mod in results['modules']):
+                print('[!] One or more modules failed to dump; no complete IPA can be produced')
+                return False
+
+            # Display names and device paths must not escape the output directory.
+            if Path(app.name).name != app.name or app.name in ('', '.', '..'):
+                raise ValueError('Unsafe app display name')
+            for mod in results['modules']:
+                if Path(mod['name']).name != mod['name'] or mod['name'] in ('', '.', '..'):
+                    raise ValueError('Unsafe module name')
+                relative = Path(mod['originalPath']).relative_to(results['bundlePath'])
+                if '..' in relative.parts:
+                    raise ValueError('Unsafe module path')
 
             # Create output directory
             if not output_dir:
@@ -187,6 +204,7 @@ class ModernIOSDumper:
             # Download dumped files via SCP
             print(f"\n[*] Downloading decrypted binaries...")
             success_count = 0
+            downloaded = {}
 
             try:
                 with SCPClient(ssh.get_transport(), socket_timeout=60) as scp:
@@ -196,18 +214,26 @@ class ModernIOSDumper:
                             continue
 
                         remote_path = mod['dumpedPath']
-                        local_path = output_dir / mod['name']
+                        # Preserve module paths: frameworks can share a filename.
+                        relative = Path(mod['originalPath']).relative_to(results['bundlePath'])
+                        local_path = output_dir / 'Binaries' / relative
+                        local_path.parent.mkdir(parents=True, exist_ok=True)
 
                         try:
                             scp.get(remote_path, str(local_path))
                             file_size = local_path.stat().st_size
                             print(f"[+] Downloaded: {mod['name']} ({file_size} bytes)")
                             success_count += 1
+                            downloaded[mod['originalPath']] = local_path
                         except Exception as e:
                             print(f"[!] Error downloading {mod['name']}: {e}")
 
             except Exception as e:
                 print(f"[!] SCP error: {e}")
+
+            if success_count != len(results['modules']):
+                print('[!] Incomplete binary transfer; refusing to package a partial dump')
+                return False
 
             # Also download the entire app bundle
             print(f"\n[*] Downloading app bundle...")
@@ -230,7 +256,7 @@ class ModernIOSDumper:
                 print(f"[*] Replacing encrypted binaries with decrypted versions...")
                 for mod in results['modules']:
                     if mod['success']:
-                        decrypted_file = output_dir / mod['name']
+                        decrypted_file = downloaded[mod['originalPath']]
                         if decrypted_file.exists():
                             # Find the original file in the bundle
                             original_path = Path(mod['originalPath'])
@@ -240,6 +266,8 @@ class ModernIOSDumper:
                             if target_file.exists():
                                 shutil.copy2(decrypted_file, target_file)
                                 print(f"    [+] Replaced: {relative_path}")
+                            else:
+                                raise FileNotFoundError(f'Missing bundle binary: {relative_path}')
 
                 # Create IPA
                 print(f"\n[*] Creating IPA...")
@@ -270,6 +298,7 @@ class ModernIOSDumper:
 
             except Exception as e:
                 print(f"[!] Error downloading bundle: {e}")
+                return False
 
             print(f"\n[+] Dump complete!")
             print(f"[+] Decrypted binaries: {success_count}/{len(modules)}")
@@ -279,8 +308,6 @@ class ModernIOSDumper:
                 print(f"\n[*] Binaries are ready for analysis (cryptid automatically set to 0)")
                 print(f"[*] Verify with: otool -l {output_dir}/Payload/<App>.app/<App> | grep cryptid")
 
-            ssh.close()
-            session.detach()
             return True
 
         except Exception as e:
@@ -288,6 +315,14 @@ class ModernIOSDumper:
             import traceback
             traceback.print_exc()
             return False
+        finally:
+            if ssh is not None:
+                ssh.close()
+            if session is not None:
+                try:
+                    session.detach()
+                except Exception:
+                    pass
 
 
 def main():

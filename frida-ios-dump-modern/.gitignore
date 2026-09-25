@@ -1,3 +1,5 @@
 .venv/
 dump_output.log
 DOWNLOAD_OLDER_APPS.md
+__pycache__/
+*.pyc
