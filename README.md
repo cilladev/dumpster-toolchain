@@ -9,7 +9,6 @@ This repo holds engine **source only**. Frida, Python packages, and compiled bin
 | [frida-ios-dump-modern](frida-ios-dump-modern/) | iOS | integrated | [jwalker/frida-ios-dump-modern](https://github.com/jwalker/frida-ios-dump-modern) |
 | frida-ipa-extract | iOS | planned | [lautarovculic/frida-ipa-extract](https://github.com/lautarovculic/frida-ipa-extract) |
 | iDump | iOS | planned | [Fi5t/iDump](https://github.com/Fi5t/iDump) |
-| ipadecrypt | iOS | planned | [londek/ipadecrypt](https://github.com/londek/ipadecrypt) |
 
 ## Use it standalone
 
